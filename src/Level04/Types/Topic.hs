@@ -60,5 +60,20 @@ getTopic (Topic t) =
 -- for this level.
 --
 encodeTopic :: Applicative f => Encoder f Topic
-encodeTopic = -- Try using 'contramap' and 'E.text'
-  error "topic JSON encoder not implemented"
+encodeTopic = contramap getTopic E.text 
+  
+-- contramap :: Contravariant f => (a -> b) -> f b -> f 
+-- text :: Applicative f => Encoder f Text  
+-- mkTopic :: Text -> Either Error Topic
+-- getTopic :: Topic -> Text
+
+
+-- Try using 'contramap' and 'E.text'
+
+
+-- personEncoder :: Applicative f => Encoder f Person
+-- personEncoder = E.mapLikeObj $ \p ->
+--   E.atKey' "name" E.text (_personName p) .
+--   E.atKey' "age" E.int (_personAge p) .
+--   E.atKey' "address" E.text (_personAddress p) .
+--   E.atKey' "numbers" (E.list E.int) (_personFavouriteLotteryNumbers p)

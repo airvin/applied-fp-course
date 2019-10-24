@@ -55,5 +55,5 @@ main = defaultMain $ testGroup "Applied FP Course - Tests"
   , testWai Core.app "Empty Input" $ do
       resp <- post "fudge/add" ""
       assertStatus' HTTP.status400 resp
-      assertBody "Empty Comment Text" resp
+      assertBody "Comment can't be empty" resp
   ]

@@ -33,6 +33,7 @@ import           Waargonaut.Encode          (Encoder)
 import qualified Waargonaut.Encode          as E
 
 import           Level04.DB.Types           (DBComment)
+import           Level04.Types              (encodeTopic, encodeCommentText)
 
 -- | Notice how we've moved these types into their own modules. It's cheap and
 -- easy to add modules to carve out components in a Haskell application. So
@@ -65,9 +66,17 @@ data Comment = Comment
 --
 -- 'https://hackage.haskell.org/package/waargonaut/docs/Waargonaut-Encode.html'
 --
+
+encodeCommentId :: Applicative f => Encoder f CommentId
+encodeCommentId = (\(CommentId int) -> int) >$<  E.int 
+
 encodeComment :: Applicative f => Encoder f Comment
-encodeComment =
-  error "Comment JSON encoder not implemented"
+encodeComment = E.mapLikeObj $ \c ->
+  E.atKey' "commentId" encodeCommentId (commentId c) .
+  E.atKey' "commentTopic" encodeTopic (commentTopic c) .
+  E.atKey' "commentBody" encodeCommentText (commentBody c) .
+  E.atKey' "commentTime" encodeISO8601DateTime (commentTime c)
+
   -- Tip: Use the 'encodeISO8601DateTime' to handle the UTCTime for us.
 
 -- | For safety we take our stored `DBComment` and try to construct a `Comment`
@@ -77,8 +86,13 @@ encodeComment =
 fromDBComment
   :: DBComment
   -> Either Error Comment
-fromDBComment =
-  error "fromDBComment not yet implemented"
+fromDBComment (DBComment i t c time) = 
+  let topic = (mkTopic t)
+      comment = (mkCommentText c) in
+
+
+
+
 
 data RqType
   = AddRq Topic CommentText
