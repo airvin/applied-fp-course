@@ -32,8 +32,8 @@ import qualified Data.Time.Format           as TF
 import           Waargonaut.Encode          (Encoder)
 import qualified Waargonaut.Encode          as E
 
-import           Level04.DB.Types           (DBComment)
-
+import           Level04.DB.Types           (DBComment(..))
+import           Level04.Types.Topic        (getTopic)
 -- | Notice how we've moved these types into their own modules. It's cheap and
 -- easy to add modules to carve out components in a Haskell application. So
 -- whenever you think that a module is too big, covers more than one piece of
@@ -43,7 +43,7 @@ import           Level04.Types.CommentText  (CommentText, getCommentText,
                                              mkCommentText, encodeCommentText)
 import           Level04.Types.Topic        (Topic, getTopic, mkTopic, encodeTopic)
 
-import           Level04.Types.Error        (Error (EmptyCommentText, EmptyTopic, UnknownRoute))
+import           Level04.Types.Error        (Error(..))
 
 newtype CommentId = CommentId Int
   deriving (Eq, Show)
@@ -85,8 +85,16 @@ encodeComment = E.mapLikeObj $ \c ->
 fromDBComment
   :: DBComment
   -> Either Error Comment
-fromDBComment = error "do from DBComment"
+-- fromDBComment (DBComment i t text time) = 
+--   Comment (CommentId i) 
+--   <$> mkTopic t 
+--   >>= (\f -> f <$> mkCommentText text <*> pure time)  
 
+fromDBComment dbc = 
+  Comment (CommentId       $ _commentId dbc) 
+        <$> (mkTopic       $ _commentTopic dbc)
+        <*> (mkCommentText $ _commentBody dbc)
+        <*> (pure          $ _commentTime dbc)
 
 data RqType
   = AddRq Topic CommentText

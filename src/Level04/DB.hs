@@ -15,6 +15,8 @@ import qualified Data.Text                          as Text
 
 import           Data.Time                          (getCurrentTime)
 
+import           Data.Bifunctor                     (Bifunctor (..))
+
 import           Database.SQLite.Simple             (Connection, Query (Query))
 import qualified Database.SQLite.Simple             as Sql
 
@@ -22,7 +24,9 @@ import qualified Database.SQLite.SimpleErrors       as Sql
 import           Database.SQLite.SimpleErrors.Types (SQLiteResponse)
 
 import           Level04.Types                      (Comment, CommentText,
-                                                     Error, Topic)
+                                                    Error(..), Topic, getTopic, fromDBComment)
+import           Level04.DB.Types                   (DBComment(..))
+
 
 -- ------------------------------------------------------------------------------|
 -- You'll need the documentation for sqlite-simple & sqlite-simple-errors handy! |
@@ -43,17 +47,21 @@ data FirstAppDB = FirstAppDB
 closeDB
   :: FirstAppDB
   -> IO ()
-closeDB =
-  error "closeDB not implemented"
+closeDB firstApp = Sql.close $ dbConn firstApp
 
 -- Given a `FilePath` to our SQLite DB file, initialise the database and ensure
 -- our Table is there by running a query to create it, if it doesn't exist
 -- already.
+
 initDB
   :: FilePath
   -> IO ( Either SQLiteResponse FirstAppDB )
-initDB fp =
-  error "initDB not implemented (use Sql.runDBAction to catch exceptions)"
+-- initDB fp = let ioConn = (Sql.open fp) in 
+--     Sql.runDBAction 
+--       FirstAppDB <$> (const ioConn (ioConn >>= (\conn -> Sql.execute_ conn createTableQ)) ) 
+
+initDB fp = Sql.runDBAction $ Sql.open fp >>= (\conn -> const (pure $ FirstAppDB conn) (Sql.execute_ conn createTableQ))
+
   where
   -- Query has an `IsString` instance so string literals like this can be
   -- converted into a `Query` type when the `OverloadedStrings` language
@@ -74,15 +82,25 @@ getComments
   :: FirstAppDB
   -> Topic
   -> IO (Either Error [Comment])
-getComments =
+getComments firstAppDB topic =
   let
-    sql = "SELECT id,topic,comment,time FROM comments WHERE topic = ?"
-  -- There are several possible implementations of this function. Particularly
-  -- there may be a trade-off between deciding to throw an Error if a DBComment
-  -- cannot be converted to a Comment, or simply ignoring any DBComment that is
-  -- not valid.
-  in
-    error "getComments not implemented (use Sql.runDBAction to catch exceptions)"
+    sql = "SELECT id,topic,comment,time FROM comments WHERE topic = ?" 
+    getDBComments :: IO [DBComment]
+    getDBComments = Sql.query (dbConn firstAppDB) sql (Sql.Only $ getTopic topic)
+    in 
+      Sql.runDBAction $ 
+        getDBComments >>= (\dbComments -> traverse fromDBComment dbComments >>= (\comment -> pure comment)) 
+        >>= (\eitherSQLError -> bimap DBError id eitherSQLError)
+      
+    
+  -- fromDBComment :: DBComment -> Either Error Comment
+
+  -- query :: FromRow r => Connection -> Query -> q -> IO [r]
+
+  -- From the getDBComments, bind, etc. we have Either Error [Comment]
+
+  -- runDBAction :: IO a -> IO (DatabaseResponse a)
+  -- type DatabaseResponse a = Either SQLiteResponse a
 
 addCommentToTopic
   :: FirstAppDB
