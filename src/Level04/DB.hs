@@ -27,7 +27,7 @@ import            Database.SQLite.Simple.Time.Implementation  (utcTimeToBuilder)
 import qualified Database.SQLite.SimpleErrors                 as Sql
 import           Database.SQLite.SimpleErrors.Types           (SQLiteResponse)
 
-import           Level04.Types                                (Comment, CommentText,
+import           Level04.Types                                (Comment(..), CommentText,
                                                               Error(..), Topic, getTopic, mkTopic, fromDBComment, getCommentText)
 import           Level04.DB.Types                             (DBComment(..))
 
@@ -119,16 +119,22 @@ getTopics
 getTopics firstAppDB =
   let
     sql = "SELECT DISTINCT topic FROM comments"
-    getDBTopics = Sql.query_ (dbConn firstAppDB) sql
+    getDBComments :: IO [DBComment]
+    getDBComments = Sql.query_ (dbConn firstAppDB) sql
   in
-    error "getTopics not implemented (use Sql.runDBAction to catch exceptions)"
+    (traverse fromDBComment =<<) 
+    <$> (first DBError <$> Sql.runDBAction getDBComments) 
+        >>= (\eitherErrorComments -> pure $ eitherErrorComments 
+          >>= (\comments -> pure $ commentTopic <$> comments))
+
 
 deleteTopic
   :: FirstAppDB
   -> Topic
   -> IO (Either Error ())
-deleteTopic =
+deleteTopic firstAppDB topic =
   let
     sql = "DELETE FROM comments WHERE topic = ?"
+    deleteTopics = Sql.execute (dbConn firstAppDB) sql (Sql.Only $ getTopic topic)
   in
-    error "deleteTopic not implemented (use Sql.runDBAction to catch exceptions)"
+    first DBError <$> Sql.runDBAction deleteTopics
