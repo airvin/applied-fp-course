@@ -10,22 +10,26 @@ module Level04.DB
   , deleteTopic
   ) where
 
-import           Data.Text                          (Text)
-import qualified Data.Text                          as Text
+import           Control.Monad                                (fmap)
+import           Control.Monad.IO.Class                       (liftIO)
 
-import           Data.Time                          (getCurrentTime)
+import           Data.Text                                    (Text)
+import qualified Data.Text                                    as Text
 
-import           Data.Bifunctor                     (Bifunctor (..))
+import           Data.Time                                    (getCurrentTime)
 
-import           Database.SQLite.Simple             (Connection, Query (Query))
-import qualified Database.SQLite.Simple             as Sql
+import           Data.Bifunctor                               (Bifunctor (..))
 
-import qualified Database.SQLite.SimpleErrors       as Sql
-import           Database.SQLite.SimpleErrors.Types (SQLiteResponse)
+import           Database.SQLite.Simple                       (Connection, Query (Query))
+import qualified Database.SQLite.Simple                       as Sql
+import            Database.SQLite.Simple.Time.Implementation  (utcTimeToBuilder)
 
-import           Level04.Types                      (Comment, CommentText,
-                                                    Error(..), Topic, getTopic, fromDBComment)
-import           Level04.DB.Types                   (DBComment(..))
+import qualified Database.SQLite.SimpleErrors                 as Sql
+import           Database.SQLite.SimpleErrors.Types           (SQLiteResponse)
+
+import           Level04.Types                                (Comment, CommentText,
+                                                              Error(..), Topic, getTopic, mkTopic, fromDBComment, getCommentText)
+import           Level04.DB.Types                             (DBComment(..))
 
 
 -- ------------------------------------------------------------------------------|
@@ -88,37 +92,34 @@ getComments firstAppDB topic =
     getDBComments :: IO [DBComment]
     getDBComments = Sql.query (dbConn firstAppDB) sql (Sql.Only $ getTopic topic)
     in 
-      Sql.runDBAction $ 
-        getDBComments >>= (\dbComments -> traverse fromDBComment dbComments >>= (\comment -> pure comment)) 
-        >>= (\eitherSQLError -> bimap DBError id eitherSQLError)
-      
-    
-  -- fromDBComment :: DBComment -> Either Error Comment
-
-  -- query :: FromRow r => Connection -> Query -> q -> IO [r]
-
-  -- From the getDBComments, bind, etc. we have Either Error [Comment]
-
-  -- runDBAction :: IO a -> IO (DatabaseResponse a)
-  -- type DatabaseResponse a = Either SQLiteResponse a
+      (traverse fromDBComment =<<) <$> (first DBError <$> Sql.runDBAction getDBComments)
+      -- Sql.runDBAction getDBComments
+      --   >>= (\dbResponseDBcomments -> pure $ first DBError dbResponseDBcomments >>= (\dbComments -> traverse fromDBComment dbComments))
 
 addCommentToTopic
   :: FirstAppDB
   -> Topic
   -> CommentText
   -> IO (Either Error ())
-addCommentToTopic =
+addCommentToTopic firstAppDB topic comment =
   let
     sql = "INSERT INTO comments (topic,comment,time) VALUES (?,?,?)"
+    -- currentTime = liftIO getCurrentTime
+    addComments = Sql.execute (dbConn firstAppDB) sql (getTopic topic, getCommentText comment, 123 :: Int)
   in
-    error "addCommentToTopic not implemented (use Sql.runDBAction to catch exceptions)"
+    first DBError <$> Sql.runDBAction addComments
+
+
+-- runDBAction :: IO a -> IO (DBResp a)
+-- execute :: ToRow q => Connection -> Query -> [q] -> IO ()
 
 getTopics
   :: FirstAppDB
   -> IO (Either Error [Topic])
-getTopics =
+getTopics firstAppDB =
   let
     sql = "SELECT DISTINCT topic FROM comments"
+    getDBTopics = Sql.query_ (dbConn firstAppDB) sql
   in
     error "getTopics not implemented (use Sql.runDBAction to catch exceptions)"
 

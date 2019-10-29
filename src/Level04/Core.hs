@@ -36,7 +36,7 @@ import qualified Waargonaut.Encode                  as E
 import           Level04.Conf                       (Conf, firstAppConfig)
 import qualified Level04.DB                         as DB
 import           Level04.Types                      (ContentType (JSON, PlainText),
-                                                     Error (EmptyCommentText, EmptyTopic, UnknownRoute),
+                                                     Error (..),
                                                      RqType (AddRq, ListRq, ViewRq),
                                                      mkCommentText, mkTopic,
                                                      renderContentType)
@@ -187,3 +187,7 @@ mkErrorResponse EmptyCommentText =
   resp400 PlainText "Empty Comment"
 mkErrorResponse EmptyTopic =
   resp400 PlainText "Empty Topic"
+mkErrorResponse EmptyId =
+  resp400 PlainText "Empty Id"
+mkErrorResponse (DBError _) =
+  resp400 PlainText "DB error"
