@@ -16,7 +16,7 @@ import           Control.Monad.IO.Class                       (liftIO)
 import           Data.Text                                    (Text)
 import qualified Data.Text                                    as Text
 
-import           Data.Time                                    (getCurrentTime)
+import           Data.Time                                    (getCurrentTime, UTCTime)
 
 import           Data.Bifunctor                               (Bifunctor (..))
 
@@ -63,8 +63,7 @@ initDB
 -- initDB fp = let ioConn = (Sql.open fp) in 
 --     Sql.runDBAction 
 --       FirstAppDB <$> (const ioConn (ioConn >>= (\conn -> Sql.execute_ conn createTableQ)) ) 
-
-initDB fp = Sql.runDBAction $ Sql.open fp >>= (\conn -> const (pure $ FirstAppDB conn) (Sql.execute_ conn createTableQ))
+initDB fp = Sql.runDBAction $ Sql.open fp >>= (\conn -> (Sql.execute_ conn createTableQ) >> (pure $ FirstAppDB conn))
 
   where
   -- Query has an `IsString` instance so string literals like this can be
@@ -104,11 +103,9 @@ addCommentToTopic
 addCommentToTopic firstAppDB topic comment =
   let
     sql = "INSERT INTO comments (topic,comment,time) VALUES (?,?,?)"
-    -- currentTime = liftIO getCurrentTime
-    addComments = Sql.execute (dbConn firstAppDB) sql (getTopic topic, getCommentText comment, 123 :: Int)
+    addComments = getCurrentTime >>= (\utcTime -> Sql.execute (dbConn firstAppDB) sql (getTopic topic, getCommentText comment, utcTime))
   in
     first DBError <$> Sql.runDBAction addComments
-
 
 -- runDBAction :: IO a -> IO (DBResp a)
 -- execute :: ToRow q => Connection -> Query -> [q] -> IO ()
@@ -119,14 +116,14 @@ getTopics
 getTopics firstAppDB =
   let
     sql = "SELECT DISTINCT topic FROM comments"
-    getDBComments :: IO [DBComment]
-    getDBComments = Sql.query_ (dbConn firstAppDB) sql
+    getDBText :: IO [Text]
+    getDBText = Sql.query_ (dbConn firstAppDB) sql
   in
-    (traverse fromDBComment =<<) 
-    <$> (first DBError <$> Sql.runDBAction getDBComments) 
-        >>= (\eitherErrorComments -> pure $ eitherErrorComments 
-          >>= (\comments -> pure $ commentTopic <$> comments))
+    (traverse mkTopic =<<) . (first DBError) <$> (Sql.runDBAction getDBText) 
 
+-- runDBAction :: IO a -> IO (DBResp a)
+-- query :: Connection -> Query -> q -> IO [r]
+-- (first DBError <$> Sql.runDBAction getDBText)  is of type IO (Either Error [Text])
 
 deleteTopic
   :: FirstAppDB

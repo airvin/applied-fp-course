@@ -14,6 +14,7 @@ module Level04.Types
   , getCommentText
   , renderContentType
   , fromDBComment
+  , encodeComment
   ) where
 
 import           GHC.Generics               (Generic)

@@ -37,3 +37,5 @@ instance FromRow DBComment where
   fromRow = liftM4 DBComment field field field field
 
 -- Now move to ``src/Level04/Types.hs``
+instance FromRow Text where
+  fromRow = field
