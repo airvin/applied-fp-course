@@ -14,7 +14,7 @@ import           Data.Text              (Text)
 
 import           Level05.Types          (Error)
 
-import           Data.Bifunctor         (first)
+import           Data.Bifunctor         (first, second)
 
 -- We're going to add a very useful abstraction to our application. We'll
 -- automate away the explicit error handling and inspection of our Either values
@@ -72,18 +72,27 @@ runAppM (AppM m) =
 
 instance Functor AppM where
   fmap :: (a -> b) -> AppM a -> AppM b
-  fmap = error "fmap for AppM not implemented"
+  fmap f appMa = AppM $ second f <$> runAppM appMa
+-- newtype AppM a = AppM (IO (Either Error a))
 
 instance Applicative AppM where
   pure :: a -> AppM a
-  pure  = error "pure for AppM not implemented"
+  pure a = AppM $ pure $ Right a
 
   (<*>) :: AppM (a -> b) -> AppM a -> AppM b
-  (<*>) = error "spaceship for AppM not implemented"
+  (<*>) appMf appMa = AppM $ runAppM appMf
+                              >>= (\eitherErrf -> runAppM appMa
+                                  >>= (\eitherErrA -> pure $ eitherErrf <*> eitherErrA))
 
 instance Monad AppM where
   (>>=) :: AppM a -> (a -> AppM b) -> AppM b
-  (>>=)  = error "bind for AppM not implemented"
+  (>>=) appMa a2appMb = AppM $ runAppM appMa 
+                                 >>= either (pure . Left) (runAppM . a2appMb)
+                                  -- Left e -> pure $ Left e
+                                  -- Right a -> runAppM $ a2appMb a
+                        
+-- either :: (e -> b) -> (a -> b) -> Either e a -> b
+
 
 instance MonadIO AppM where
   liftIO :: IO a -> AppM a
