@@ -71,7 +71,8 @@ runDB
   :: (a -> Either Error b)
   -> IO a
   -> AppM b
-runDB fn ioA = AppM $ Sql.runDBAction ioA >>= (\dbRespA -> pure $ first DBError dbRespA >>= (\a -> fn a))
+runDB fn ioA = AppM $ Sql.runDBAction ioA >>= (\dbRespA -> pure $ first DBError dbRespA >>= fn)
+-- runDB fn ioA = AppM $ Sql.runDBAction ioA >>= (\dbRespA -> pure $ first DBError dbRespA >>= (\a -> fn a))
 -- runDB fn ioA = AppM $ Sql.runDBAction ioA >>= (\dbRespA -> case dbRespA of
 --                                                   Left sqliteResponse -> pure $ Left $ DBError sqliteResponse
 --                                                   Right a -> pure $ fn a)

@@ -19,7 +19,7 @@ import           Network.HTTP.Types                 (Status, hContentType,
                                                      status200, status400,
                                                      status404, status500)
 
-import qualified Data.ByteString.Lazy               as LBS
+import qualified Data.ByteString.Lazy.Char8               as LBS
 
 import           Data.Either                        (either)
 import           Data.Monoid                        ((<>))
@@ -200,6 +200,6 @@ mkErrorResponse EmptyCommentText =
   resp400 PlainText "Empty Comment"
 mkErrorResponse EmptyTopic =
   resp400 PlainText "Empty Topic"
-mkErrorResponse ( DBError _ ) =
+mkErrorResponse ( DBError errorMessage ) =
   -- Be a sensible developer and don't leak your DB errors over the internet.
-  resp500 PlainText "Oh noes"
+  resp400 PlainText (LBS.pack (show errorMessage))
