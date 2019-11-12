@@ -1,4 +1,5 @@
-module Level05.DB.Types where
+module Level05.DB.Types 
+  (DBComment(..)) where
 
 import           Data.Text                      (Text)
 import           Data.Time                      (UTCTime)
@@ -28,3 +29,6 @@ instance FromRow DBComment where
             <*> field
             <*> field
             <*> field
+
+instance FromRow Text where
+  fromRow = field

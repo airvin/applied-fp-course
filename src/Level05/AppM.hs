@@ -2,19 +2,19 @@
 {-# LANGUAGE InstanceSigs          #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Level05.AppM
-  ( AppM
+  ( AppM(..)
   , liftEither
   , runAppM
   ) where
 
-import           Control.Monad.Except   (MonadError (..))
-import           Control.Monad.IO.Class (MonadIO (..))
+import           Control.Monad.Except       (MonadError (..))
+import           Control.Monad.IO.Class     (MonadIO (..))
 
-import           Data.Text              (Text)
+import           Data.Text                  (Text)
 
-import           Level05.Types          (Error)
+import           Level05.Types              (Error)
 
-import           Data.Bifunctor         (first, second)
+import           Data.Bifunctor             (first, second)
 
 -- We're going to add a very useful abstraction to our application. We'll
 -- automate away the explicit error handling and inspection of our Either values
@@ -91,19 +91,19 @@ instance Monad AppM where
                                   -- Left e -> pure $ Left e
                                   -- Right a -> runAppM $ a2appMb a
                         
--- either :: (e -> b) -> (a -> b) -> Either e a -> b
-
-
 instance MonadIO AppM where
   liftIO :: IO a -> AppM a
-  liftIO = error "liftIO for AppM not implemented"
+  -- liftIO ioA = AppM $ ioA >>= (\a -> pure $ Right a)
+  liftIO ioA = AppM $ Right <$> ioA
 
 instance MonadError Error AppM where
   throwError :: Error -> AppM a
-  throwError = error "throwError for AppM not implemented"
+  throwError err = AppM $ pure $ Left err
 
   catchError :: AppM a -> (Error -> AppM a) -> AppM a
-  catchError = error "catchError for AppM not implemented"
+  catchError appMa fn = AppM $ runAppM appMa >>= (\eea -> case eea of
+                                                Left err -> runAppM $ fn err
+                                                Right a -> pure $ Right a)
 
 -- This is a helper function that will `lift` an Either value into our new AppM
 -- by applying `throwError` to the Left value, and using `pure` to lift the
@@ -115,7 +115,6 @@ instance MonadError Error AppM where
 liftEither
   :: Either Error a
   -> AppM a
-liftEither =
-  error "liftEither not implemented"
+liftEither eitherErrorA = AppM $ pure eitherErrorA
 
 -- Go to 'src/Level05/DB.hs' next.

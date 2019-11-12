@@ -23,6 +23,7 @@ import qualified Data.ByteString.Lazy               as LBS
 
 import           Data.Either                        (either)
 import           Data.Monoid                        ((<>))
+import           Data.Bifunctor                     (Bifunctor (..))
 
 import           Data.Text                          (Text)
 import           Data.Text.Encoding                 (decodeUtf8)
@@ -56,15 +57,15 @@ runApp = do
   cfgE <- prepareAppReqs
   -- Loading the configuration can fail, so we have to take that into account now.
   case cfgE of
-    Left err   ->
+    Left _  ->
       -- We can't run our app at all! Display the message and exit the application.
-      undefined
+      error "Error starting application"
     Right cfg ->
       -- We have a valid config! We can now complete the various pieces needed to run our
       -- application. This function 'finally' will execute the first 'IO a', and then, even in the
       -- case of that value throwing an exception, execute the second 'IO b'. We do this to ensure
       -- that our DB connection will always be closed when the application finishes, or crashes.
-      Ex.finally (run undefined undefined) (DB.closeDB cfg)
+      Ex.finally (run 8082 $ app cfg) (DB.closeDB cfg)
 
 -- We need to complete the following steps to prepare our app requirements:
 --
@@ -75,8 +76,7 @@ runApp = do
 --
 prepareAppReqs
   :: IO ( Either StartUpError DB.FirstAppDB )
-prepareAppReqs =
-  error "copy your prepareAppReqs from the previous level."
+prepareAppReqs = first DBInitErr <$> DB.initDB (Conf.dbFilePath Conf.firstAppConfig)
 
 -- | Some helper functions to make our lives a little more DRY.
 mkResponse
@@ -123,15 +123,28 @@ resp200Json e =
   resp200 JSON . encodeUtf8 .
   E.simplePureEncodeTextNoSpaces e
 
--- |
-
 -- How has this implementation changed, now that we have an AppM to handle the
 -- errors for our application? Could it be simplified? Can it be changed at all?
 app
   :: DB.FirstAppDB
   -> Application
-app db rq cb =
-  error "app not reimplemented"
+-- app db rq cb = 
+--   let appMRes = (mkRequest rq) >>= (\rq' -> (handleRequest db rq')) in
+--     runAppM appMRes >>= (\eeRes -> let res = either mkErrorResponse id eeRes in cb res)
+app db rq cb = 
+  let appMRes = mkRequest rq >>= handleRequest db in
+    runAppM appMRes >>= cb . either mkErrorResponse id
+
+-- Nick's Solution
+-- app
+--   :: DB.FirstAppDB -- ^ Add the Database record to our app so we can use it
+--   -> Application
+-- app db rq cb =
+--     runAppM (mkRequest rq >>= handleRequest db)
+--         >>= cb . handleRespErr
+--     where
+--         handleRespErr :: Either Error Response -> Response
+--         handleRespErr = either mkErrorResponse id
 
 handleRequest
   :: DB.FirstAppDB
