@@ -80,9 +80,12 @@ instance Applicative AppM where
   pure a = AppM $ pure $ Right a
 
   (<*>) :: AppM (a -> b) -> AppM a -> AppM b
-  (<*>) appMf appMa = AppM $ runAppM appMf
-                              >>= (\eitherErrf -> runAppM appMa
-                                  >>= (\eitherErrA -> pure $ eitherErrf <*> eitherErrA))
+  -- (<*>) appF appA = appF >>= (\atob -> atob <$> appA)
+  (<*>) appF appA = appF >>= (<$> appA)
+
+  -- (<*>) appMf appMa = AppM $ runAppM appMf
+  --                             >>= (\eitherErrf -> runAppM appMa
+  --                                 >>= (\eitherErrA -> pure $ eitherErrf <*> eitherErrA))
 
 instance Monad AppM where
   (>>=) :: AppM a -> (a -> AppM b) -> AppM b

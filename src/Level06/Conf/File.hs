@@ -1,24 +1,31 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Level06.Conf.File where
 
+import           Data.Bifunctor             (Bifunctor (..))
+
 import           Data.ByteString            (ByteString)
 
 import           Data.Text                  (Text, pack)
 
-import           Data.Bifunctor             (first)
+import           Data.Bifunctor             (first, second)
 import           Data.Monoid                (Last (Last))
 
+import           Control.Monad.IO.Class     (liftIO)
 import           Control.Exception          (try)
 
 import qualified Data.Attoparsec.ByteString as AB
+import           Waargonaut.Attoparsec      (pureDecodeAttoparsecByteString)
+
+import           Data.ByteString.Char8      as BC
 
 import           Waargonaut                 (Json)
 import qualified Waargonaut.Decode          as D
-import           Waargonaut.Decode.Error    (DecodeError (ParseFailed))
+import           Waargonaut.Decode.Error    (DecodeError (ParseFailed, ConversionFailure))
 
-import           Level06.AppM               (AppM (runAppM))
-import           Level06.Types              (ConfigError (BadConfFile),
-                                             PartialConf (PartialConf))
+import           Level06.AppM               (AppM (AppM))
+import           Level06.Types              (ConfigError (BadConfFile, ConfigFileReadError),
+                                             PartialConf (PartialConf),
+                                             partialConfDecoder)
 -- $setup
 -- >>> :set -XOverloadedStrings
 
@@ -35,7 +42,11 @@ import           Level06.Types              (ConfigError (BadConfFile),
 readConfFile
   :: FilePath
   -> AppM ConfigError ByteString
-readConfFile =
+readConfFile fp = AppM $ bimap ConfigFileReadError BC.pack <$> (try $ Prelude.readFile fp)
+
+  -- readFile :: FilePath -> IO String
+  -- try :: Exception e => IO a -> IO (Either e a)
+
   -- Reading a file may throw an exception for any number of
   -- reasons. Use the 'try' function from 'Control.Exception' to catch
   -- the exception and turn it into an error value that is thrown as
@@ -43,7 +54,7 @@ readConfFile =
   --
   -- No exceptions from reading the file should escape this function.
   --
-  error "readConfFile not implemented"
+
 
 -- | Construct the function that will take a ``FilePath``, read it in, decode it,
 -- and construct our ``PartialConf``.
@@ -52,5 +63,5 @@ parseJSONConfigFile
   -> AppM ConfigError PartialConf
 parseJSONConfigFile =
   error "parseJSONConfigFile not implemented"
-
+  
 -- Go to 'src/Level06/Conf.hs' next.

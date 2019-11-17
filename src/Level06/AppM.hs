@@ -2,7 +2,7 @@
 {-# LANGUAGE InstanceSigs          #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Level06.AppM
-  ( AppM
+  ( AppM (..)
   , App
   , liftEither
   , runAppM
@@ -49,37 +49,56 @@ runApp = runAppM
 
 instance Functor (AppM e) where
   fmap :: (a -> b) -> AppM e a -> AppM e b
-  fmap = error "fmap for (AppM e) not implemented"
+  -- fmap f appMea = AppM $ runAppM appMea >>= (\eea -> pure $ bimap id f eea)
+  -- fmap f appMea = AppM $ runAppM appMea >>= (pure . bimap id f)
+  -- fmap f appMea = AppM $ bimap id f <$> runAppM appMea
+  fmap f appMea = AppM $ second f <$> runAppM appMea
 
+-- instance Functor (AppM) where
+--   fmap :: (a -> b) -> App a -> App b
+--   -- fmap f appMea = AppM $ runAppM appMea >>= (\eea -> pure $ bimap id f eea)
+--   -- fmap f appMea = AppM $ runAppM appMea >>= (pure . bimap id f)
+--   -- fmap f appMea = AppM $ bimap id f <$> runAppM appMea
+--   fmap f appa = AppM $ second f <$> runApp appa
+
+  --  newtype AppM e a = AppM
+--   { runAppM :: IO (Either e a)}
+  
 instance Applicative (AppM e) where
   pure :: a -> AppM e a
-  pure  = error "pure for (AppM e) not implemented"
+  pure a = AppM $ pure $ Right a
 
   (<*>) :: AppM e (a -> b) -> AppM e a -> AppM e b
-  (<*>) = error "spaceship for (AppM e) not implemented"
+  (<*>) appMf appMa = appMf >>= (<$> appMa)
 
 instance Monad (AppM e) where
   (>>=) :: AppM e a -> (a -> AppM e b) -> AppM e b
-  (>>=)  = error "bind for (AppM e) not implemented"
+  (>>=) appMa a2appMb = AppM $ runAppM appMa 
+                                 >>= either (pure . Left) (runAppM . a2appMb)
 
 instance MonadIO (AppM e) where
   liftIO :: IO a -> AppM e a
-  liftIO = error "liftIO for (AppM e) not implemented"
+  liftIO ioA = AppM $ Right <$> ioA
 
 instance MonadError e (AppM e) where
   throwError :: e -> AppM e a
-  throwError = error "throwError for (AppM e) not implemented"
+  throwError err = AppM $ pure $ Left err
 
   catchError :: AppM e a -> (e -> AppM e a) -> AppM e a
-  catchError = error "catchError for (AppM e) not implemented"
-
+  catchError appMa fn = AppM $ runAppM appMa >>= (\eea -> case eea of
+                                                Left err -> runAppM $ fn err
+                                                Right a -> pure $ Right a)
 -- The 'Bifunctor' instance for 'Either' has proved useful several times
 -- already. Now that our 'AppM' exposes both type variables that are used in our
 -- 'Either', we can define a Bifunctor instance and reap similar benefits.
 instance Bifunctor AppM where
   bimap :: (e -> d) -> (a -> b) -> AppM e a -> AppM d b
-  bimap = error "bimap for AppM not implemented"
-
+  -- bimap f1 f2 appmea = AppM $ runAppM appmea >>= (\eea ->pure $ case eea of 
+  --                                          Left e -> Left $ f1 e
+  --                                          Right a -> Right $ f2 a)
+  -- bimap f1 f2 appmea = AppM $ runAppM appmea >>= (\eea -> pure $ bimap f1 f2 eea)
+  bimap f1 f2 appmea = AppM $ bimap f1 f2 <$> runAppM appmea
+  
 -- This is a helper function that will `lift` an Either value into our new AppM
 -- by applying `throwError` to the Left value, and using `pure` to lift the
 -- Right value into the AppM.
@@ -88,4 +107,4 @@ instance Bifunctor AppM where
 -- pure :: Applicative m => a -> m a
 --
 liftEither :: Either e a -> AppM e a
-liftEither = error "liftEither not implemented"
+liftEither eitherErrorA = AppM $ pure eitherErrorA
