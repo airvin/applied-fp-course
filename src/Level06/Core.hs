@@ -23,7 +23,7 @@ import           Network.HTTP.Types                 (Status, hContentType,
 
 import qualified Data.ByteString.Lazy               as LBS
 
-import           Data.Bifunctor                     (first)
+import           Data.Bifunctor                     (first, bimap)
 import           Data.Either                        (either)
 import           Data.Monoid                        ((<>))
 
@@ -40,13 +40,13 @@ import           Level06.AppM                       (App, AppM (..),
                                                      liftEither, runApp)
 import qualified Level06.Conf                       as Conf
 import qualified Level06.DB                         as DB
-import           Level06.Types                      (Conf, ConfigError,
+import           Level06.Types                      (DBFilePath (..), Conf (..), ConfigError,
                                                      ContentType (..),
                                                      Error (..),
                                                      RqType (AddRq, ListRq, ViewRq),
                                                      encodeComment, encodeTopic,
                                                      mkCommentText, mkTopic,
-                                                     renderContentType)
+                                                     renderContentType, confPortToWai)
 
 -- | Our start-up is becoming more complicated and could fail in new and
 -- interesting ways. But we also want to be able to capture these errors in a
@@ -57,7 +57,13 @@ data StartUpError
   deriving Show
 
 runApplication :: IO ()
-runApplication = error "copy your previous 'runApp' implementation and refactor as needed"
+runApplication = runAppM prepareAppReqs >>= either (\err -> error "error starting application") (\cfgFirstAppDB -> let (cfg, firstAppDB) = cfgFirstAppDB in 
+    Ex.finally (run (confPortToWai cfg) (app cfg firstAppDB)) (DB.closeDB firstAppDB))
+
+-- prepareAppReqs :: AppM StartUpError (Conf, DB.FirstAppDB)
+-- finally :: IO a	-> IO b -> IO a
+-- run :: Port -> Application -> IO ()
+-- either :: (a -> c) -> (b -> c) -> Either a b -> c
 
 -- | We need to complete the following steps to prepare our app requirements:
 --
@@ -72,9 +78,24 @@ runApplication = error "copy your previous 'runApp' implementation and refactor 
 -- up!
 --
 prepareAppReqs :: AppM StartUpError (Conf, DB.FirstAppDB)
-prepareAppReqs = error "copy your prepareAppReqs from the previous level."
 
--- | Some helper functions to make our lives a little more DRY.
+prepareAppReqs = first ConfErr (Conf.parseOptions "")
+  >>= (\conf -> (\db -> (conf, db)) <$> (AppM $ first DBInitErr <$> DB.initDB (getDBFilePath (dbFilePath conf))))
+
+
+-- prepareAppReqs :: IO ( Either StartUpError DB.FirstAppDB )
+-- data Conf = Conf
+--   { dbFilePath :: FilePath
+--   }
+
+-- firstAppConfig :: Conf
+-- firstAppConfig = Conf "app_db.db"
+
+-- initDB :: FilePath -> IO ( Either SQLiteResponse FirstAppDB )
+
+-- parseOptions :: FilePath -> AppM ConfigError Conf
+
+  -- | Some helper functions to make our lives a little more DRY.
 mkResponse
   :: Status
   -> ContentType

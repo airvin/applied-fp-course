@@ -5,6 +5,7 @@ module Level06.AppM
   ( AppM (..)
   , App
   , liftEither
+  , liftIO
   , runAppM
   , runApp
   ) where

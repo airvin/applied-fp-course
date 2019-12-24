@@ -22,7 +22,7 @@ import           Waargonaut                 (Json)
 import qualified Waargonaut.Decode          as D
 import           Waargonaut.Decode.Error    (DecodeError (ParseFailed, ConversionFailure))
 
-import           Level06.AppM               (AppM (AppM))
+import           Level06.AppM               (AppM (AppM), liftEither)
 import           Level06.Types              (ConfigError (BadConfFile, ConfigFileReadError),
                                              PartialConf (PartialConf),
                                              partialConfDecoder)
@@ -61,7 +61,12 @@ readConfFile fp = AppM $ bimap ConfigFileReadError BC.pack <$> (try $ Prelude.re
 parseJSONConfigFile
   :: FilePath
   -> AppM ConfigError PartialConf
-parseJSONConfigFile =
-  error "parseJSONConfigFile not implemented"
+parseJSONConfigFile fp = (readConfFile fp) >>= (\bs -> liftEither $ first getDecodeError $ myDecode bs)
+-- parseJSONConfigFile fp = (readConfFile fp) >>= (\bs -> liftEither $ first getDecodeError (pureDecodeAttoparsecByteString partialConfDecoder bs))
+    where
+      -- getDecodeError :: (DecodeError, a) -> ConfigError
+      -- getDecodeError (d, _) = BadConfFile d
+      getDecodeError = BadConfFile . fst
+      myDecode = pureDecodeAttoparsecByteString partialConfDecoder
   
 -- Go to 'src/Level06/Conf.hs' next.
