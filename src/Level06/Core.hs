@@ -57,7 +57,7 @@ data StartUpError
   deriving Show
 
 runApplication :: IO ()
-runApplication = runAppM prepareAppReqs >>= either (\err -> error "error starting application") (\cfgFirstAppDB -> let (cfg, firstAppDB) = cfgFirstAppDB in 
+runApplication = runAppM prepareAppReqs >>= either print (\cfgFirstAppDB -> let (cfg, firstAppDB) = cfgFirstAppDB in 
     Ex.finally (run (confPortToWai cfg) (app cfg firstAppDB)) (DB.closeDB firstAppDB))
 
 -- prepareAppReqs :: AppM StartUpError (Conf, DB.FirstAppDB)
@@ -79,9 +79,8 @@ runApplication = runAppM prepareAppReqs >>= either (\err -> error "error startin
 --
 prepareAppReqs :: AppM StartUpError (Conf, DB.FirstAppDB)
 
-prepareAppReqs = first ConfErr (Conf.parseOptions "")
+prepareAppReqs = first ConfErr (Conf.parseOptions "files/appconfig.json")
   >>= (\conf -> (\db -> (conf, db)) <$> (AppM $ first DBInitErr <$> DB.initDB (getDBFilePath (dbFilePath conf))))
-
 
 -- prepareAppReqs :: IO ( Either StartUpError DB.FirstAppDB )
 -- data Conf = Conf
