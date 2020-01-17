@@ -108,4 +108,4 @@ instance Bifunctor AppM where
 -- pure :: Applicative m => a -> m a
 --
 liftEither :: Either e a -> AppM e a
-liftEither eitherErrorA = AppM $ pure eitherErrorA
+liftEither = either throwError (AppM . pure . Right)

@@ -39,14 +39,15 @@ import qualified Level07.Conf                       as Conf
 import qualified Level07.DB                         as DB
 
 import qualified Level07.Responses                  as Res
-import           Level07.Types                      (Conf, ConfigError,
+import           Level07.Types                      (Conf (dbFilePath), ConfigError,
                                                      ContentType (PlainText),
+                                                     DBFilePath (getDBFilePath),
                                                      Error (..), RqType (..),
                                                      confPortToWai,
                                                      encodeComment, encodeTopic,
                                                      mkCommentText, mkTopic)
 
-import           Level07.AppM                       (App, Env (..), liftEither,
+import           Level07.AppM                       (App, AppM (..), Env (..), liftEither,
                                                      runApp)
 
 -- | We're going to use the `mtl` ExceptT monad transformer to make the loading of
@@ -82,9 +83,94 @@ runApplication = do
 --
 -- 'mtl' on Hackage: https://hackage.haskell.org/package/mtl
 --
+
+-- 1. pass in config - turn ConfErr into StartUpError
+-- 2. initialise DB - turn dbInitErr into StartUpError
+-- 3. If no errors, create an Env from the firstAppDB 
+-- and wrap it all in an ExceptT
+
+-- prepareAppReqs :: ExceptT StartUpError IO Env
+-- prepareAppReqs = ExceptT $ Conf.parseOptions "files/appconfig.json" >>= (\eitherConfErrConf ->
+--   either 
+--     (pure . Left . ConfErr) 
+--     (\conf -> let ioEitherFirstAppDB = DB.initDB $ dbFilePath conf in 
+--       ioEitherFirstAppDB >>= (\eitherFirstAppDB -> pure $ either 
+--         (Left . DBInitErr) 
+--         (\firstAppDB -> Right $ Env {
+--           envLoggingFn=(\text -> AppM (\_ -> pure $ Right ())), 
+--           envConfig=conf, 
+--           envDB=firstAppDB})
+--         eitherFirstAppDB)
+--     )
+--     eitherConfErrConf)
+
+-- prepareAppReqs :: ExceptT StartUpError IO Env
+-- prepareAppReqs = ExceptT $ Conf.parseOptions "files/appconfig.json" >>= (\eitherConfErrConf ->
+--   either 
+--     (pure . Left . ConfErr) 
+--     (\conf -> let ioEitherFirstAppDB = DB.initDB $ dbFilePath conf in 
+--       either 
+--         (Left . DBInitErr) 
+--         (\firstAppDB -> Right $ Env {
+--           envLoggingFn=(\text -> AppM (\_ -> pure $ Right ())), 
+--           envConfig=conf, 
+--           envDB=firstAppDB}) <$> ioEitherFirstAppDB
+--     )
+--     eitherConfErrConf)
+
+-- prepareAppReqs :: ExceptT StartUpError IO Env
+-- prepareAppReqs = ExceptT $ Conf.parseOptions "files/appconfig.json" >>= either 
+--   (pure . Left . ConfErr) 
+--   (\conf -> let ioEitherFirstAppDB = DB.initDB $ dbFilePath conf in 
+--     either 
+--       (Left . DBInitErr) 
+--       (\firstAppDB -> Right $ Env {
+--         envLoggingFn=(\text -> AppM (\_ -> pure $ Right ())), 
+--         envConfig=conf, 
+--         envDB=firstAppDB}) <$> ioEitherFirstAppDB
+--   )
+
 prepareAppReqs :: ExceptT StartUpError IO Env
-prepareAppReqs = error "prepareAppReqs not reimplemented with ExceptT"
-  -- You may copy your previous implementation of this function and try refactoring it. On the
+prepareAppReqs = ExceptT $ Conf.parseOptions "files/appconfig.json" >>= either 
+  (pure . Left . ConfErr) 
+  (\conf -> either 
+      (Left . DBInitErr) 
+      (Right . Env (liftIO . print) conf) <$> (DB.initDB $ dbFilePath conf)
+  )
+  
+  -- liftIO :: IO a -> AppM e a
+  -- a -> IO ()
+
+  -- parseOptions :: FilePath -> IO (Either ConfigError Conf)
+
+  -- ConfErr :: ConfigError -> StartupError
+
+  -- dbFilePath :: Conf -> DBFilePath
+  -- initDB :: DBFilePath -> IO ( Either SQLiteResponse FirstAppDB)
+
+  -- DBInitErr :: SQLiteResponse -> StartupError
+
+  -- data Env = Env
+  -- { envLoggingFn :: Text -> App ()
+  -- , envConfig    :: Conf
+  -- , envDB        :: FirstAppDB
+  -- }
+
+          -- This has the type :: Either StartUpError Env
+          -- either 
+          --   (Left . DBInitErr) 
+          --   (\firstAppDB -> Right $ Env {
+          --     envLoggingFn=(\text -> AppM (\_ -> pure $ Right ())), 
+          --     envConfig=conf, 
+          --     envDB=firstAppDB})
+          --   eitherFirstAppDB)
+
+  -- first ConfErr (Conf.parseOptions "files/appconfig.json")
+  -- >>= (\conf -> (\db -> (conf, db)) <$> (AppM $ first DBInitErr <$> DB.initDB (getDBFilePath (dbFilePath conf))))
+
+-- runExceptT :: ExceptT e m a -> m (Either e a)
+
+  -- You may copy your previous implementation of this function and try refactoring it. On the 
   -- condition you have to explain to the person next to you what you've done and why it works.
 
 -- | Now that our request handling and response creating functions operate
@@ -94,8 +180,27 @@ prepareAppReqs = error "prepareAppReqs not reimplemented with ExceptT"
 app
   :: Env
   -> Application
-app =
-  error "Copy your completed 'app' from the previous level and refactor it here"
+-- app env rq cb = let ioEitherErrorResponse = runApp (mkRequest rq >>= handleRequest) env in
+--   ioEitherErrorResponse >>= (\eitherErrorResponse -> either 
+--     (cb . mkErrorResponse)
+--     cb
+--     eitherErrorResponse)
+-- app env rq cb = let ioEitherErrorResponse = runApp (mkRequest rq >>= handleRequest) env in
+--   ioEitherErrorResponse >>= either (cb . mkErrorResponse) cb
+-- app env rq cb = runApp (mkRequest rq >>= handleRequest) env >>= either (cb . mkErrorResponse) cb
+app env rq cb = runApp (mkRequest rq >>= handleRequest) env >>= cb . either mkErrorResponse id
+
+-- From level 6
+-- app :: Conf -> DB.FirstAppDB -> Application
+-- app cfg db rq cb =
+--   runApp (handleRequest db =<< mkRequest rq) >>= cb . handleRespErr
+--   where
+--     handleRespErr :: Either Error Response -> Response
+--     handleRespErr = either mkErrorResponse id
+
+-- Application :: rq -> (Response -> Received) -> ResponseReceived
+-- mkErrorResponse :: Error -> Response
+-- cb :: Response -> IO Network.Wai.Internal.ResponseReceived
 
 handleRequest
   :: RqType
